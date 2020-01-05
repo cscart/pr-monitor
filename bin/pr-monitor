@@ -1,0 +1,64 @@
+#!/usr/bin/env php
+<?php
+
+use Amp\MultiReasonException;
+use CsCart\PrMonitor\App\Application;
+use CsCart\PrMonitor\App\Github\GithubClientAdapter;
+use CsCart\PrMonitor\App\ReportService\StdReportService;
+use CsCart\PrMonitor\Domain\Service\PullRequestService;
+use CsCart\PrMonitor\Domain\ValueObject\Repository;
+use Github\Client;
+use function Amp\ParallelFunctions\parallelMap;
+use function Amp\Promise\wait;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+if (getenv('PR_MONITOR_APP_ENV') !== 'production') {
+    $config = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+    $config->load();
+}
+
+$exitCode = 0;
+$reportService = new StdReportService();
+try {
+    $githubClient = new Client();
+    $githubClient->authenticate(
+        (string) getenv('PR_MONITOR_GITHUB_LOGIN'),
+        (string) getenv('PR_MONITOR_GITHUB_ACCESS_TOKEN'),
+        Client::AUTH_HTTP_PASSWORD
+    );
+    $repository = new Repository(
+        (string) getenv('PR_MONITOR_REPOSITORY_OWNER'),
+        (string) getenv('PR_MONITOR_REPOSITORY')
+    );
+    $pullRequestService = new PullRequestService(new GithubClientAdapter($githubClient, $repository));
+    $app = new Application(
+        $pullRequestService,
+        $reportService,
+        (string) getenv('PR_MONITOR_PR_MESSAGE')
+    );
+    $pullRequests = json_decode((string) getenv('PR_MONITOR_FORCE_PRS'), true)
+        ?: $app->getPullRequestNumbers();
+    $pullRequestChunks = array_chunk($pullRequests, 10);
+
+    foreach ($pullRequestChunks as $pullRequestNumbers) {
+        wait(
+            parallelMap(
+                $pullRequestNumbers,
+                static function (int $pullRequestNumber) use ($app) {
+                    $app->processPullRequestState($pullRequestNumber);
+                }
+            )
+        );
+    }
+} catch (MultiReasonException $multiException) {
+    foreach ($multiException->getReasons() as $exception) {
+        $reportService->reportError($exception);
+        $exitCode = 1;
+    }
+} catch (Throwable $exception) {
+    $reportService->reportError($exception);
+    $exitCode = 1;
+}
+
+exit($exitCode);
