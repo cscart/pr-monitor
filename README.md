@@ -17,10 +17,10 @@
 The application requires the following environment variables to be set:
 
 * `PR_MONITOR_APP_ENV` — runtime mode. Can be either `production` or `development`.
-  
+
     In the `development` mode environment variables are loaded from the local `.env` file in the application directory.
-  
-    You can use `.env.example` file for the reference.
+
+    You can use the `.env.example` file for the reference.
 * `PR_MONITOR_GITHUB_LOGIN` — login of the user that will interact with Github API.
 * `PR_MONITOR_GITHUB_ACCESS_TOKEN` — access token of the mentioned user.
 * `PR_MONITOR_REPOSITORY_OWNER` — owner of the monitored repository.
@@ -32,16 +32,16 @@ The application requires the following environment variables to be set:
 
 The following variables can be set to debug the application:
 
-* `PR_MONITOR_FORCE_PRS` — numbers of PRs to check. 
+* `PR_MONITOR_FORCE_PRS` — numbers of PRs to check.
 
-    Must a JSON-encoded array of numbers, e.g. `[1234,2345,5678]`. 
+    Must be a JSON-encoded array of numbers, e.g. `[1234,2345,5678]`.
 
 ## Run
 
 After the application is configured, you can run it with the following command:
 ```bash
 php bin/pr-monitor
-``` 
+```
 
 The application does the following with all the open pull requests in the repository:
 1. Checks whether the pull request has merge conflicts.
